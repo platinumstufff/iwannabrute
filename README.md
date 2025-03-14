@@ -10,8 +10,8 @@ Bruteforce A5-A6 numeric password with ease.
 
 # Usage
 iwannabrute needs initial setup before usage.
- - Homebrew: `brew install bash curl libusb`
- - MacPorts: `sudo port install bash curl libusb`
+ - Homebrew: `brew install bash curl libusb xxd`
+ - MacPorts: `sudo port install bash curl libusb xxd`
  - For macOS 12.7.6 and lower, use MacPorts, not Homebrew.
  
 1. Clone and cd into this repository: `git clone https://github.com/platinumstufff/iwannabrute --recursive && cd iwannabrute`
