@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.0"
+script_version="1.0.1"
 
 mk_bruteforce_ramdisk() {
         device=$1
@@ -149,9 +149,9 @@ mk_bruteforce_ramdisk() {
         echo "Patching kernel..."
 
         #offset for lzssdec
-        OFFSET=$(xxd -p kernelcache | tr -d '\n' | grep -bo "cefaedfe" | awk -F: 'NR==1 {print $1}')
+        OFFSET=$(xxd -p kernelcache | tr -d '\n' | ggrep -bo "cefaedfe" | awk -F: 'NR==1 {print $1}')
 
-        if [ -z "$OFFSET" ]; then
+        if [[ -z "$OFFSET" || "$OFFSET" == "0" ]]; then
             echo "Cannot find offset for lzssdec"
             exit 1
         fi
@@ -164,7 +164,7 @@ mk_bruteforce_ramdisk() {
 
         PATTERN="b0f5fa6f00f0"
         HEX_PATTERN=$(echo "$PATTERN" | sed 's/\?/./g')
-        MATCH_OFFSET=$(xxd -p kernelcache.dec | tr -d '\n' | grep -abo "$HEX_PATTERN" | awk -F: 'NR==1 {print $1}')
+        MATCH_OFFSET=$(xxd -p kernelcache.dec | tr -d '\n' | ggrep -abo "$HEX_PATTERN" | awk -F: 'NR==1 {print $1}')
 
         if [ -z "$MATCH_OFFSET" ]; then
             echo "Cannot find offset for IOAESAccelerator patch"
@@ -728,7 +728,7 @@ if [[ $no_internet_check != 1 ]]; then
 fi
 
 
-local checks=(curl git patch unzip xxd zip)
+local checks=(curl git patch unzip xxd zip ggrep)
 local check_fail
 for check in "${checks[@]}"; do
     if [[ $debug_mode == 1 ]]; then
