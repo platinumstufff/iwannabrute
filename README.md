@@ -5,7 +5,7 @@ Bruteforce A5-A6 numeric password with ease.
 
 # Prerequsites
 
-1. A computer running macOS.
+1. A computer running macOS but with an intel chip.
 2. A compatible device (A5-A6)
 
 # Usage
