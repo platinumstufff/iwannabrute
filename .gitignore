@@ -3,3 +3,4 @@ ramdisks/*/
 resources/ipwndfu/
 resources/firstrun
 ipwndfu.zip
+ssh_config
