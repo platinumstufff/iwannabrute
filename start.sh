@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.0"
+script_version="1.1.0"
 
 mk_bruteforce_ramdisk() {
         device=$1
@@ -148,32 +148,9 @@ mk_bruteforce_ramdisk() {
 
         echo "Patching kernel..."
 
-        #offset for lzssdec
-        OFFSET=$(xxd -p kernelcache | tr -d '\n' | grep -bo "cefaedfe" | awk -F: 'NR==1 {print $1}')
+        ../../bin/Darwin/aespatched kernelcache kernelcache.dec
 
-        if [ -z "$OFFSET" ]; then
-            echo "Cannot find offset for lzssdec"
-            exit 1
-        fi
-
-        DECIMAL_OFFSET=$(($OFFSET / 2))
-        ADJUSTED_OFFSET=$(($DECIMAL_OFFSET - 1))
-
-        ../../bin/Darwin/lzssdec -o "$ADJUSTED_OFFSET" < kernelcache > kernelcache.dec
         mv kernelcache kernelcache.orig
-
-        PATTERN="b0f5fa6f00f0"
-        HEX_PATTERN=$(echo "$PATTERN" | sed 's/\?/./g')
-        MATCH_OFFSET=$(xxd -p kernelcache.dec | tr -d '\n' | grep -abo "$HEX_PATTERN" | awk -F: 'NR==1 {print $1}')
-
-        if [ -z "$MATCH_OFFSET" ]; then
-            echo "Cannot find offset for IOAESAccelerator patch"
-            exit 1
-        fi
-        ADJUSTED_MATCH_OFFSET=$((MATCH_OFFSET / 2 + 4))
-
-        dd if=/dev/zero bs=1 count=4 conv=notrunc of=kernelcache.dec seek=$ADJUSTED_MATCH_OFFSET 2>/dev/null
-        printf '\x0C\x46\x0C\x46' | dd of=kernelcache.dec bs=1 seek=$ADJUSTED_MATCH_OFFSET conv=notrunc 2>/dev/null
 
         ../../bin/Darwin/xpwntool kernelcache.dec kernelcache -t kernelcache.orig
 
@@ -321,10 +298,16 @@ check_ramdisk_cache(){
 
 pwn_device() {
 
+    if [ "$is_fake_device" = true ]; then
+        echo "device is fake, exiting"
+        exit
+    fi
+
     if [[ -z "${is_a5+x}" ]]; then
         echo "Detected $device_name ($deviceid)."
         if (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | bin/Darwin/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null); then
             echo "Device already in pwnDFU. Continuing..."
+            ipwndfu send_ibss
         else
             case $pwnder in
                 "ipwndfu") ipwndfu pwn ;;
@@ -493,14 +476,29 @@ download_file() {
 }
 
 get_device_info() {
-    if ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null); then
-        echo "[*] Waiting for device in DFU mode"
-    fi
-    
-    while ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null); do
-        sleep 1
+    fake_deviceid=""
+    for arg in "$@"; do
+        case $arg in
+            fake-deviceid=*)
+                fake_deviceid="${arg#*=}"
+                ;;
+        esac
     done
-    deviceid=$(bin/Darwin/irecovery -q | grep PRODUCT | sed 's/PRODUCT: //')
+    if [[ -n "$fake_deviceid" ]]; then
+        echo "[*] Using fake device: $fake_deviceid"
+        is_fake_device=true
+        deviceid="$fake_deviceid"
+    else
+        if ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' > /dev/null); then
+            echo "[*] Waiting for device in DFU mode"
+        fi
+
+        while ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' > /dev/null); do
+            sleep 1
+        done
+
+        deviceid=$(bin/Darwin/irecovery -q | grep PRODUCT | sed 's/PRODUCT: //')
+    fi
     case $deviceid in
   #      "iPhone3,1") device_name="iPhone 4 (GSM)" pwnder="ipwnder32" ;;
   #      "iPhone3,2") device_name="iPhone 4 (GSM, Rev A)" pwnder="ipwnder32" ;;
@@ -570,6 +568,9 @@ send_ramdisk() {
     ../../bin/Darwin/irecovery -f kernelcache
     echo "Booting device now..."
     ../../bin/Darwin/irecovery -c bootx
+    echo ""
+    echo "Device should show text on screen now."
+    echo "After passcode is found please reboot using home + power button."
 }
 
 version_check() {
@@ -743,8 +744,7 @@ done
 if [[ ! -e "./resources/firstrun" || $(cat "./resources/firstrun") != "$platform_ver" || $check_fail == 1 ]]; then
     install_depends
 fi
-
-get_device_info
+get_device_info "$@"
 echo ""
 echo "Enter ramdisk version (9.0.2 is default)"
 echo ""
@@ -772,4 +772,4 @@ othertmp=$(ls "$(dirname "$0")" | grep -c tmp)
 
 pushd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null
 
-main
+main "$@"

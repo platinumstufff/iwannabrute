@@ -5,7 +5,7 @@ Bruteforce A5-A6 numeric password with ease.
 
 # Prerequsites
 
-1. A computer running macOS.
+1. A x86 computer running macOS.
 2. A compatible device (A5-A6)
 
 # Usage
@@ -39,7 +39,7 @@ The tool will use the AES engine as much as possible with no restrictions at the
 
 # Other Stuff
 
-- [Reddit Post]()
+- [Reddit Post](https://www.reddit.com/r/setupapp/comments/1jn09d5/release_iwannabrute_bruteforce_a5a6_with_ease/)
 
 # Credits
 - [AJAIZ](https://github.com/AsyJAIZ) for original bruteforce method.
