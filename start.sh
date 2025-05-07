@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.1.0"
+script_version="1.2.0"
 
 mk_bruteforce_ramdisk() {
         device=$1
@@ -209,7 +209,7 @@ set_tool_paths() {
 
         platform_arch="$(uname -m)"
         if [[ $platform_arch == "arm64" ]]; then
-            dir+="/arm64"
+            echo "Please note that arm64 macs are semi-untested."
         fi
 
         # macos version check
@@ -749,7 +749,13 @@ echo ""
 echo "Enter ramdisk version (9.0.2 is default)"
 echo ""
 read -p "Version:" ios_version
+major="${ios_version%%.*}"
+if [ "$major" = "10" ]; then
+    echo "For iOS 10.x devices use 9.0.2 ramdisk."
+    exit
+fi
 ios_version=${ios_version:-9.0.2}
+
 echo ""
 echo "Checking is Ramdisk exists."
 echo ""
