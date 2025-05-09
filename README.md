@@ -1,6 +1,6 @@
 <h1 align="center">iwannabrute</h1>
 <p align="center">
-Bruteforce A5-A6 numeric password with ease.
+Bruteforce A4-A6 numeric password with ease.
 </p>
 
 # Prerequsites
