@@ -6,7 +6,7 @@ Bruteforce A5-A6 numeric password with ease.
 # Prerequsites
 
 1. A computer running macOS.
-2. A compatible device (A5-A6)
+2. A compatible device (A4-A6)
 
 # Usage
 iwannabrute needs initial setup before usage.
@@ -34,7 +34,6 @@ The tool will use the AES engine as much as possible with no restrictions at the
 # Soon™
 
 - Linux support
-- A4 support
 - Disable password automatically
 
 # Other Stuff
