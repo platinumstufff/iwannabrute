@@ -1,6 +1,6 @@
 <h1 align="center">iwannabrute</h1>
 <p align="center">
-Bruteforce A5-A6 numeric password with ease.
+Bruteforce A4-A6 numeric password with ease.
 </p>
 
 # Prerequsites
@@ -34,7 +34,6 @@ The tool will use the AES engine as much as possible with no restrictions at the
 # Soon™
 
 - Linux support
-- A4 support
 - Disable password automatically
 
 # Other Stuff
