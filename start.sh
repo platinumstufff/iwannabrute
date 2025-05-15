@@ -1,6 +1,6 @@
 #!/bin/bash
 
-script_version="1.2.0"
+script_version="2.0"
 
 mk_bruteforce_ramdisk() {
         device=$1
@@ -271,7 +271,6 @@ set_tool_paths() {
 
 }
 
-
 check_ramdisk_cache(){
     ramdisk_path="ramdisks/bruteforce-$deviceid-$ios_version"
 
@@ -297,24 +296,19 @@ check_ramdisk_cache(){
 }
 
 pwn_device() {
-
     if [ "$is_fake_device" = true ]; then
         echo "device is fake, exiting"
         exit
     fi
+    # check if device in pwndfu already
+    if (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | bin/Darwin/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null); then
+        echo "Device already in pwnDFU mode."
+        ipwndfu send_ibss
+    fi
 
-    if [[ -z "${is_a5+x}" ]]; then
-        echo "Detected $device_name ($deviceid)."
-        if (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | bin/Darwin/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null); then
-            echo "Device already in pwnDFU. Continuing..."
-            ipwndfu send_ibss
-        else
-            case $pwnder in
-                "ipwndfu") ipwndfu pwn ;;
-            esac
-        fi
-
-    else
+    #pwndfu code
+    case $pwnder in
+    a5)
         echo ""
         echo ""
         echo "Detected A5 device."
@@ -332,8 +326,20 @@ pwn_device() {
 
         echo "Device in pwnDFU mode detected!"
         ipwndfu send_ibss
-    fi
-
+        ;;
+    ipwndfu)
+        echo "Using ipwndu for pwning..."
+        ipwndfu pwn
+        ;;
+    ipwnder32)
+        echo "Using ipwnder32 for pwning..."
+        ipwnder32
+        ;;
+    *)
+        echo "ipwnder value is empty. wtf"
+        exit 1
+        ;;
+    esac
 }
 
 ipwndfu() {
@@ -500,30 +506,31 @@ get_device_info() {
         deviceid=$(bin/Darwin/irecovery -q | grep PRODUCT | sed 's/PRODUCT: //')
     fi
     case $deviceid in
-  #      "iPhone3,1") device_name="iPhone 4 (GSM)" pwnder="ipwnder32" ;;
-  #      "iPhone3,2") device_name="iPhone 4 (GSM, Rev A)" pwnder="ipwnder32" ;;
-  #      "iPhone3,3") device_name="iPhone 4 (CDMA)" pwnder="ipwnder32";;
-        "iPhone4,1") device_name="iPhone 4S" is_a5=true;;
-        "iPhone5,1") device_name="iPhone 5 (GSM)" pwnder="ipwndfu";;
-        "iPhone5,2") device_name="iPhone 5 (Global)" pwnder="ipwndfu";;
-        "iPhone5,3") device_name="iPhone 5C (GSM)" pwnder="ipwndfu";;
-        "iPhone5,4") device_name="iPhone 5C (Global)" pwnder="ipwndfu";;
-  #      "iPad1,1") device_name="iPad 1" pwnder="ipwnder32";;
-        "iPad2,1") device_name="iPad 2 (Wi-Fi)" is_a5=true;;
-        "iPad2,2") device_name="iPad 2 (GSM)" is_a5=true;;
-        "iPad2,3") device_name="iPad 2 (CDMA)" is_a5=true;;
-        "iPad2,4") device_name="iPad 2 (Wi-Fi, Rev A)" is_a5=true;;
-        "iPad2,5") device_name="iPad mini 1 (Wi-Fi)" is_a5=true;;
-        "iPad2,6") device_name="iPad mini 1 (GSM)" is_a5=true;;
-        "iPad2,7") device_name="iPad mini 1 (Global)" is_a5=true;;
-        "iPad3,1") device_name="iPad 3 (Wi-Fi)" is_a5=true;;
-        "iPad3,2") device_name="iPad 3 (CDMA)" is_a5=true;;
-        "iPad3,3") device_name="iPad 3 (GSM)" is_a5=true;;
-        "iPad3,4") device_name="iPad 4 (Wi-Fi)" pwnder="ipwndfu";;
-        "iPad3,5") device_name="iPad 4 (GSM)" pwnder="ipwndfu";;
-        "iPad3,6") device_name="iPad 4 (Global)" pwnder="ipwndfu";;
-        "iPod4,1") device_name="iPod touch 4" is_a5=true;;
-        "iPod5,1") device_name="iPod touch 5" is_a5=true;;
+        "iPhone3,1") device_name="iPhone 4 (GSM)" default_version="7.1.2" pwnder="ipwnder32" ;;
+        "iPhone3,2") device_name="iPhone 4 (GSM, Rev A)" default_version="7.1.2" pwnder="ipwnder32" ;;
+        "iPhone3,3") device_name="iPhone 4 (CDMA)" default_version="7.1.2" pwnder="ipwnder32";;
+        "iPhone4,1") device_name="iPhone 4S" default_version="9.0.2" pwnder="a5";;
+        "iPhone5,1") device_name="iPhone 5 (GSM)" default_version="9.0.2" pwnder="ipwndfu";;
+        "iPhone5,2") device_name="iPhone 5 (Global)" default_version="9.0.2" pwnder="ipwndfu";;
+        "iPhone5,3") device_name="iPhone 5C (GSM)" default_version="9.0.2" pwnder="ipwndfu";;
+        "iPhone5,4") device_name="iPhone 5C (Global)" default_version="9.0.2" pwnder="ipwndfu";;
+    #   Disabled due iOS 5.1.1 is last version for iPad 1(aes patch needs to be reworked)
+    #   "iPad1,1") device_name="iPad 1" default_version="5.1.1" pwnder="ipwnder32";;
+        "iPad2,1") device_name="iPad 2 (Wi-Fi)" default_version="9.0.2" pwnder="a5";;
+        "iPad2,2") device_name="iPad 2 (GSM)" default_version="9.0.2" pwnder="a5";;
+        "iPad2,3") device_name="iPad 2 (CDMA)" default_version="9.0.2" pwnder="a5";;
+        "iPad2,4") device_name="iPad 2 (Wi-Fi, Rev A)" default_version="9.0.2" pwnder="a5";;
+        "iPad2,5") device_name="iPad mini 1 (Wi-Fi)" default_version="9.0.2" pwnder="a5";;
+        "iPad2,6") device_name="iPad mini 1 (GSM)" default_version="9.0.2" pwnder="a5";;
+        "iPad2,7") device_name="iPad mini 1 (Global)" default_version="9.0.2" pwnder="a5";;
+        "iPad3,1") device_name="iPad 3 (Wi-Fi)" default_version="9.0.2" pwnder="a5";;
+        "iPad3,2") device_name="iPad 3 (CDMA)" default_version="9.0.2" pwnder="a5";;
+        "iPad3,3") device_name="iPad 3 (GSM)" default_version="9.0.2" pwnder="a5";;
+        "iPad3,4") device_name="iPad 4 (Wi-Fi)" default_version="9.0.2" pwnder="ipwndfu";;
+        "iPad3,5") device_name="iPad 4 (GSM)" default_version="9.0.2" pwnder="ipwndfu";;
+        "iPad3,6") device_name="iPad 4 (Global)" default_version="9.0.2" pwnder="ipwndfu";;
+        "iPod4,1") device_name="iPod touch 4" default_version="6.1.6" pwnder="ipwnder32";;
+        "iPod5,1") device_name="iPod touch 5" default_version="9.0.2" pwnder="a5";;
         *) device_name="Unsupported device" unsupported=true;;
     esac
     if [[ -z "${unsupported+x}" ]]; then
@@ -746,7 +753,7 @@ if [[ ! -e "./resources/firstrun" || $(cat "./resources/firstrun") != "$platform
 fi
 get_device_info "$@"
 echo ""
-echo "Enter ramdisk version (9.0.2 is default)"
+echo "Enter ramdisk version ($default_version is default)"
 echo ""
 read -p "Version:" ios_version
 major="${ios_version%%.*}"
@@ -754,7 +761,7 @@ if [ "$major" = "10" ]; then
     echo "For iOS 10.x devices use 9.0.2 ramdisk."
     exit
 fi
-ios_version=${ios_version:-9.0.2}
+ios_version="${ios_version:-$default_version}"
 
 echo ""
 echo "Checking is Ramdisk exists."
