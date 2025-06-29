@@ -304,6 +304,7 @@ pwn_device() {
     if (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | bin/Darwin/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null); then
         echo "Device already in pwnDFU mode."
         ipwndfu send_ibss
+        return
     fi
 
     #pwndfu code
@@ -320,9 +321,9 @@ pwn_device() {
             echo "[*] Waiting for device in pwnDFU mode"
         fi
     
-        while ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | bin/Darwin/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null ); do
-            sleep 1
-        done
+       while ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | bin/Darwin/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null ); do
+         sleep 1
+       done
 
         echo "Device in pwnDFU mode detected!"
         ipwndfu send_ibss
@@ -331,9 +332,9 @@ pwn_device() {
         echo "Using ipwndu for pwning..."
         ipwndfu pwn
         ;;
-    ipwnder32)
-        echo "Using ipwnder32 for pwning..."
-        ipwnder32
+    ipwnder)
+        echo "Using ipwnder for pwning..."
+        ipwnder
         ;;
     *)
         echo "ipwnder value is empty. wtf"
@@ -460,6 +461,10 @@ ipwndfu() {
             $p2_sudo "$python2" ipwndfu -p
         ;;
     esac
+
+}
+
+ipwnder() {
 
 }
 
