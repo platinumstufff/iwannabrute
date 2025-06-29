@@ -46,7 +46,7 @@ mk_bruteforce_ramdisk() {
         echo Failed to download firmware keys
         exit 1
         fi
-        ../../../bin/Darwin/partialZipBrowser -g BuildManifest.plist $ipsw_link &> /dev/null
+        ../../../$dir/partialZipBrowser -g BuildManifest.plist $ipsw_link &> /dev/null
 
         images="iBSS.iBEC.applelogo.DeviceTree.kernelcache.RestoreRamDisk"
         for i in {1..6}
@@ -67,37 +67,106 @@ mk_bruteforce_ramdisk() {
         
             echo Downloading $component...
         
-            ../../../bin/Darwin/partialZipBrowser -g $component $ipsw_link &> /dev/null
+            ../../../$dir/partialZipBrowser -g $component $ipsw_link &> /dev/null
         
             echo Done!
         
             if [ "$is_64" = "true" ]; then
                 if [ "$temp_type2" = "RestoreRamDisk" ]; then
-                    ../../../bin/Darwin/img4 -i $component -o RestoreRamDisk.raw.dmg ${!iv}${!key}
+                    ../../../$dir/img4 -i $component -o RestoreRamDisk.raw.dmg ${!iv}${!key}
                         if [ "$iOS_Vers" -gt "11" ]; then
                         echo Downloading $component.trustcache...
-                        ../../../bin/Darwin/partialZipBrowser -g Firmware/$component.trustcache $ipsw_link &> /dev/null
+                        ../../../$dir/partialZipBrowser -g Firmware/$component.trustcache $ipsw_link &> /dev/null
                         echo Done!
                     fi
             else
-                    ../../../bin/Darwin/img4 -i $temp_type2* -o $temp_type2.raw ${!iv}${!key}
+                    ../../../$dir/img4 -i $temp_type2* -o $temp_type2.raw ${!iv}${!key}
                 fi
             else
         
                 if [ "$temp_type2" = "RestoreRamDisk" ]; then
-                    ../../../bin/Darwin/xpwntool $component RestoreRamDisk.dec.img3 -iv ${!iv} -k ${!key} -decrypt &> /dev/null
+                    echo "decrypting $component"
+                    echo "iv=${!iv} key=${!key}"
+                    ../../../$dir/xpwntool $component RestoreRamDisk.dec.img3 -iv ${!iv} -k ${!key} -decrypt &> /dev/null
             else
-                    ../../../bin/Darwin/xpwntool $temp_type2* $temp_type2.dec.img3 -iv ${!iv} -k ${!key} -decrypt &> /dev/null
+                    echo "decrypting $component"
+                    echo "iv=${!iv} key=${!key}"
+                    ../../../$dir/xpwntool $temp_type2* $temp_type2.dec.img3 -iv ${!iv} -k ${!key} -decrypt &> /dev/null
                 fi
             fi
         done
         echo "Making ramdisk..."
     bootargs="-v amfi=0xff cs_enforcement_disable=1 msgbuf=1048576 wdt=-1"
 
-    if [ "$is_64" = "true" ]; then
-        echo "no"
+
+    if [ "$oscheck" != 'Darwin' ]; then
+        echo "linak detektet!!!!"
+        echo "pls work"
+        ../../../$dir/xpwntool RestoreRamDisk.dec.img3 RestoreRamDisk.raw.dmg
+        sleep 1
+        echo "1"
+        ../../../$dir/hfsplus grow 30000000 RestoreRamDisk.raw.dmg
+        echo "2"
+
+
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg mkdir usr/local/bin
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg mkdir usr/bin
+        
+
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg untar ../../../resources/ssh.tar.gz
+
+        if [ "$iOS_Vers" -gt 7 ]; then
+            echo "iOS 8 or later detected, patching restored_external..."
+            ../../../$dir/hfsplus RestoreRamDisk.raw.dmg mv /usr/local/bin/restored_external /usr/local/bin/restored_external.real
+            ../../../$dir/hfsplus RestoreRamDisk.raw.dmg add ../../../resources/setup.sh /usr/local/bin/restored_external
+            ../../../$dir/hfsplus RestoreRamDisk.raw.dmg chmod 755 /usr/local/bin/restored_external
+        fi
+
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg mv /sbin/reboot /sbin/reboot_bak
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg mv /sbin/halt /sbin/halt_bak
+
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg rm /usr/local/bin/restored_external.real
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg add ../../../resources/restored_external /usr/local/bin/restored_external.sshrd
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg chmod 755 /usr/local/bin/restored_external.sshrd
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg add ../../../resources/bruteforce /usr/bin/bruteforce
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg add ../../../resources/device_infos /usr/bin/device_infos
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg chmod 755 /usr/bin/bruteforce
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg chmod 755 /usr/bin/device_infos
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg add ../../../resources/setup.sh /usr/local/bin/restored_external
+        ../../../$dir/hfsplus RestoreRamDisk.raw.dmg chmod 755 /usr/local/bin/restored_external
+
+        ../../../$dir/xpwntool RestoreRamDisk.raw.dmg ramdisk.dmg -t RestoreRamDisk.dec.img3
+        mv -v ramdisk.dmg ../
+        ../../../$dir/xpwntool iBSS.dec.img3 iBSS.raw
+        ../../../$dir/iBoot32Patcher iBSS.raw iBSS.patched -r
+        cp iBSS.patched ../pwnediBSS
+        ../../../$dir/xpwntool iBSS.patched iBSS -t iBSS.dec.img3
+        mv -v iBSS ../
+        ../../../$dir/xpwntool iBEC.dec.img3 iBEC.raw
+        ../../../$dir/iBoot32Patcher iBEC.raw iBEC.patched -r -d -b "rd=md0 $bootargs"
+        ../../../$dir/iBoot32Patcher iBEC.raw iBEC_boot.patched -r -d -b "$bootargs"
+        ../../../$dir/xpwntool iBEC.patched iBEC -t iBEC.dec.img3
+        ../../../$dir/xpwntool iBEC_boot.patched iBEC_boot -t iBEC.dec.img3
+        mv -v iBEC ../
+        mv -v iBEC_boot ../
+        mv -v applelogo.dec.img3 ../applelogo
+        mv -v DeviceTree.dec.img3 ../devicetree
+        mv -v kernelcache.dec.img3 ../kernelcache
+        cd ..
+        rm -rf work
+
+        echo "Patching kernel..."
+
+        ../../$dir/aespatched kernelcache kernelcache.dec
+
+        mv kernelcache kernelcache.orig
+
+        ../../$dir/xpwntool kernelcache.dec kernelcache -t kernelcache.orig
+
+        cd ../../
+        exit
     else
-        ../../../bin/Darwin/xpwntool RestoreRamDisk.dec.img3 RestoreRamDisk.raw.dmg
+        ../../../$dir/xpwntool RestoreRamDisk.dec.img3 RestoreRamDisk.raw.dmg
         hdiutil resize -size 30MB RestoreRamDisk.raw.dmg
         mkdir ramdisk_mountpoint
         sudo hdiutil attach -mountpoint ramdisk_mountpoint/ -owners off RestoreRamDisk.raw.dmg
@@ -126,18 +195,18 @@ mk_bruteforce_ramdisk() {
 
 
         hdiutil detach ramdisk_mountpoint
-        ../../../bin/Darwin/xpwntool RestoreRamDisk.raw.dmg ramdisk.dmg -t RestoreRamDisk.dec.img3
+        ../../../$dir/xpwntool RestoreRamDisk.raw.dmg ramdisk.dmg -t RestoreRamDisk.dec.img3
         mv -v ramdisk.dmg ../
-        ../../../bin/Darwin/xpwntool iBSS.dec.img3 iBSS.raw
-        ../../../bin/Darwin/iBoot32Patcher iBSS.raw iBSS.patched -r
+        ../../../$dir/xpwntool iBSS.dec.img3 iBSS.raw
+        ../../../$dir/iBoot32Patcher iBSS.raw iBSS.patched -r
         cp iBSS.patched ../pwnediBSS
-        ../../../bin/Darwin/xpwntool iBSS.patched iBSS -t iBSS.dec.img3
+        ../../../$dir/xpwntool iBSS.patched iBSS -t iBSS.dec.img3
         mv -v iBSS ../
-        ../../../bin/Darwin/xpwntool iBEC.dec.img3 iBEC.raw
-        ../../../bin/Darwin/iBoot32Patcher iBEC.raw iBEC.patched -r -d -b "rd=md0 $bootargs"
-        ../../../bin/Darwin/iBoot32Patcher iBEC.raw iBEC_boot.patched -r -d -b "$bootargs"
-        ../../../bin/Darwin/xpwntool iBEC.patched iBEC -t iBEC.dec.img3
-        ../../../bin/Darwin/xpwntool iBEC_boot.patched iBEC_boot -t iBEC.dec.img3
+        ../../../$dir/xpwntool iBEC.dec.img3 iBEC.raw
+        ../../../$dir/iBoot32Patcher iBEC.raw iBEC.patched -r -d -b "rd=md0 $bootargs"
+        ../../../$dir/iBoot32Patcher iBEC.raw iBEC_boot.patched -r -d -b "$bootargs"
+        ../../../$dir/xpwntool iBEC.patched iBEC -t iBEC.dec.img3
+        ../../../$dir/xpwntool iBEC_boot.patched iBEC_boot -t iBEC.dec.img3
         mv -v iBEC ../
         mv -v iBEC_boot ../
         mv -v applelogo.dec.img3 ../applelogo
@@ -148,31 +217,125 @@ mk_bruteforce_ramdisk() {
 
         echo "Patching kernel..."
 
-        ../../bin/Darwin/aespatched kernelcache kernelcache.dec
+        ../../$dir/aespatched kernelcache kernelcache.dec
 
         mv kernelcache kernelcache.orig
 
-        ../../bin/Darwin/xpwntool kernelcache.dec kernelcache -t kernelcache.orig
+        ../../$dir/xpwntool kernelcache.dec kernelcache -t kernelcache.orig
 
         cd ../../
     fi
 }
 
+clean() {
+    kill $httpserver_pid $iproxy_pid $anisette_pid 2>/dev/null
+    popd &>/dev/null
+    rm -rf "$(dirname "$0")/tmp$$/"* "$(dirname "$0")/iP"*/ "$(dirname "$0")/tmp$$/" 2>/dev/null
+    if [[ $platform == "macos" && $(ls "$(dirname "$0")" | grep -v tmp$$ | grep -c tmp) == 0 &&
+          $no_finder != 1 ]]; then
+        killall -CONT AMPDevicesAgent AMPDeviceDiscoveryAgent MobileDeviceUpdater
+    fi
+}
+
+clean_sudo() {
+    clean
+    sudo rm -rf /tmp/futurerestore /tmp/*.json "$(dirname "$0")/tmp$$/"* "$(dirname "$0")/iP"*/ "$(dirname "$0")/tmp$$/"
+    sudo kill $sudoloop_pid
+}
+
+clean_usbmuxd() {
+    clean_sudo
+    if [[ $(ls "$(dirname "$0")" | grep -v tmp$$ | grep -c tmp) != 0 ]]; then
+        return
+    fi
+    sudo killall -9 usbmuxd usbmuxd2 2>/dev/null
+    sleep 1
+    if [[ $(command -v systemctl) ]]; then
+        sudo systemctl restart usbmuxd
+    elif [[ $(command -v rc-service) ]]; then
+        sudo rc-service usbmuxd start
+    fi
+}
+
+prepare_udev_rules() {
+    local owner="$1"
+    local group="$2"
+    echo "ACTION==\"add\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"05ac\", ATTR{idProduct}==\"122[27]|128[0-3]|1338\", OWNER=\"$owner\", GROUP=\"$group\", MODE=\"0660\" TAG+=\"uaccess\"" > 39-libirecovery.rules
+}
+
 install_depends() {
     echo "Installing dependencies..."
-    rm -f "../resources/firstrun"
+    rm -f "resources/firstrun"
 
     if [[ $platform == "linux" ]]; then
-        echo "iwannabrute does not support linux at the moment =(."
+        echo "* iwannabrute will be installing dependencies from your distribution's package manager"
+        echo "* Enter your user password when prompted"
+        if [[ $distro != "debian" && $distro != "fedora-atomic" ]]; then
+            echo
+            echo "Before continuing, make sure that your system is fully updated first!"
+            echo "${color_Y}* This operation can result in a partial upgrade and may cause breakage if your system is not updated${color_N}"
+            echo
+        fi
+        pause
+        prepare_udev_rules usbmux plugdev
+    fi
+
+    if [[ $distro == "arch" ]]; then
+        sudo pacman -Sy --noconfirm --needed base-devel ca-certificates ca-certificates-mozilla curl git ifuse libimobiledevice libxml2 openssh pyenv python udev unzip usbmuxd usbutils vim zenity zip zstd
+        prepare_udev_rules root storage
+
+    elif [[ $distro == "debian" ]]; then
+        if [[ -n $ubuntu_ver ]]; then
+            sudo add-apt-repository -y universe
+        fi
+        sudo apt update
+        sudo apt install -m -y build-essential ca-certificates curl git ifuse libssl3 libssl-dev libxml2 libzstd1 openssh-client patch python3 unzip usbmuxd usbutils xxd zenity zip zlib1g-dev
+        if [[ $(command -v systemctl 2>/dev/null) ]]; then
+            sudo systemctl enable --now udev systemd-udevd usbmuxd 2>/dev/null
+        fi
+
+    elif [[ $distro == "fedora" ]]; then
+        sudo dnf install -y ca-certificates git ifuse libimobiledevice libxml2 libzstd openssl openssl-devel patch python3 systemd udev usbmuxd vim-common zenity zip zlib-devel
+        sudo dnf group install -y c-development
+        sudo ln -sf /etc/pki/tls/certs/ca-bundle.crt /etc/pki/tls/certs/ca-certificates.crt
+        prepare_udev_rules root usbmuxd
+
+    elif [[ $distro == "fedora-atomic" ]]; then
+        rpm-ostree install patch vim-common zenity
+        echo "* You may need to reboot to apply changes with rpm-ostree. Perform a reboot after this before running the script again."
+
+    elif [[ $distro == "opensuse" ]]; then
+        sudo zypper -n install ca-certificates curl git ifuse libimobiledevice-1_0-6 libopenssl-3-devel libxml2 libzstd1 openssl-3 patch pyenv python3 usbmuxd unzip vim zenity zip zlib-devel
+        sudo zypper -n install -t pattern devel_basis
+        prepare_udev_rules usbmux usbmux # idk if this is right
+
+    elif [[ $distro == "gentoo" ]]; then
+        sudo emerge -av --noreplace app-arch/zstd app-misc/ca-certificates app-pda/ifuse dev-libs/libxml2 libimobiledevice net-misc/curl openssh python udev unzip usbmuxd usbutils vim zenity zip
+
+    elif [[ $distro == "void" ]]; then
+        sudo xbps-install curl git patch openssh python3 unzip xxd zenity zip base-devel libffi-devel bzip2-devel openssl openssl-devel readline readline-devel sqlite-devel xz liblzma-devel zlib zlib-devel
+
     elif [[ $platform == "macos" ]]; then
         echo "* iwannabrute will be installing dependencies and setting up permissions of tools"
-        xattr -cr ./bin/Darwin
+        xattr -cr ../bin/macos
         echo "Installing Xcode Command Line Tools"
         xcode-select --install
         echo "* Make sure to install requirements from Homebrew/MacPorts: https://github.com/LukeZGD/Legacy-iOS-Kit/wiki/How-to-Use"
         pause
     fi
-    echo "$platform_ver" > "./resources/firstrun"
+
+    echo "$platform_ver" > "resources/firstrun"
+    if [[ $platform == "linux" && $distro != "fedora-atomic" ]]; then
+        # from linux_fix and libirecovery-rules by Cryptiiiic
+        if [[ $(command -v systemctl) ]]; then
+            sudo systemctl enable --now systemd-udevd usbmuxd 2>/dev/null
+        fi
+        sudo cp 39-libirecovery.rules /etc/udev/rules.d/39-libirecovery.rules
+        sudo chown root:root /etc/udev/rules.d/39-libirecovery.rules
+        sudo chmod 0644 /etc/udev/rules.d/39-libirecovery.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger -s usb
+    fi
 
     echo "Install script done! Please run the script again to proceed"
     echo "If your iOS device is plugged in, unplug and replug your device"
@@ -202,15 +365,157 @@ set_tool_paths() {
     the rest of the tools not listed here will be executed using:
     "$dir/$name_of_tool"
     '
-    if [[ $OSTYPE == "darwin"* ]]; then
-        platform="macos"
-        platform_ver="${1:-$(sw_vers -productVersion)}"
-        dir="./bin/Darwin"
+
+    if [[ $OSTYPE == "linux"* ]]; then
+        source /etc/os-release
+        platform="linux"
+        platform_ver="$PRETTY_NAME"
+        dir="bin/Linux/"
+
+        # architecture check
+        if [[ $(uname -m) == "a"* && $(getconf LONG_BIT) == 64 ]]; then
+            platform_arch="arm64"
+        elif [[ $(uname -m) == "x86_64" ]]; then
+            platform_arch="x86_64"
+        else
+            error "Your architecture ($(uname -m)) is not supported."
+        fi
+        dir+="$platform_arch"
+
+        # version check
+        if [[ -n $UBUNTU_CODENAME ]]; then
+            case $UBUNTU_CODENAME in
+                "jammy" | "kinetic"   ) ubuntu_ver=22;;
+                "lunar" | "mantic"    ) ubuntu_ver=23;;
+                "noble" | "oracular"  ) ubuntu_ver=24;;
+                "plucky" | "questing" ) ubuntu_ver=25;;
+            esac
+            if [[ -z $ubuntu_ver ]]; then
+                source /etc/upstream-release/lsb-release 2>/dev/null
+                ubuntu_ver="$(echo "$DISTRIB_RELEASE" | cut -c -2)"
+            fi
+            if [[ -z $ubuntu_ver ]]; then
+                ubuntu_ver="$(echo "$VERSION_ID" | cut -c -2)"
+            fi
+        elif [[ -e /etc/debian_version ]]; then
+            debian_ver=$(cat /etc/debian_version)
+            case $debian_ver in
+                *"sid" | "kali"* ) debian_ver="sid";;
+                * ) debian_ver="$(echo "$debian_ver" | cut -c -2)";;
+            esac
+        elif [[ $ID == "fedora" || $ID_LIKE == "fedora" || $ID == "nobara" ]]; then
+            fedora_ver=$VERSION_ID
+        fi
 
         platform_arch="$(uname -m)"
         if [[ $platform_arch == "arm64" ]]; then
-            echo "Please note that arm64 macs are semi-untested."
+            dir+="/arm64"
         fi
+
+        # distro check
+        if [[ $ID == "arch" || $ID_LIKE == "arch" || $ID == "artix" ]]; then
+            distro="arch"
+        elif (( ubuntu_ver >= 22 )) || (( debian_ver >= 12 )) || [[ $debian_ver == "sid" ]]; then
+            distro="debian"
+        elif (( fedora_ver >= 37 )); then
+            distro="fedora"
+            if [[ $(command -v rpm-ostree) ]]; then
+                distro="fedora-atomic"
+            fi
+        elif [[ $ID == "opensuse-tumbleweed" ]]; then
+            distro="opensuse"
+        elif [[ $ID == "gentoo" || $ID_LIKE == "gentoo" || $ID == "pentoo" ]]; then
+            distro="gentoo"
+        elif [[ $ID == "void" ]]; then
+            distro="void"
+        elif [[ -n $ubuntu_ver || -n $debian_ver || -n $fedora_ver ]]; then
+            error "Your distro version ($platform_ver - $platform_arch) is not supported. See the repo README for supported OS versions/distros"
+        else
+            echo "Your distro ($platform_ver - $platform_arch) is not detected/supported. See the repo README for supported OS versions/distros"
+            echo "* You may still continue, but you will need to install required packages and libraries manually as needed."
+            sleep 5
+            pause
+        fi
+
+        # live cd/usb check
+        if [[ $(id -u $USER) == 999 || $USER == "liveuser" ]]; then
+            live_cdusb=1
+            live_cdusb_str="Live session"
+             "Linux Live session detected."
+            if [[ $(pwd) == "/home"* ]]; then
+                df . -h
+                if [[ $(lsblk -o label | grep -c "casper-rw") == 1 || $(lsblk -o label | grep -c "persistence") == 1 ]]; then
+                    echo "Detected iwannabrute running on persistent storage."
+                    live_cdusb_str+=" - Persistent storage"
+                else
+                    echo "Detected iwannabrute running on temporary storage."
+                    echo "* You may run out of space and get errors during the restore process."
+                    echo "* Please move iwannabrute to a drive that is NOT used for the live USB."
+                    echo "* This may mean using another external HDD/flash drive to store iwannabrute on."
+                    echo "* To use one USB drive only, create the live USB using Rufus with Persistent Storage enabled."
+                    sleep 5
+                    pause
+                    live_cdusb_str+=" - Temporary storage"
+                fi
+            fi
+        fi
+
+        # if "/media" is detected in pwd, echo user of possible permission issues
+        if [[ $(pwd) == *"/media"* ]]; then
+            echo "You might get permission errors like \"Permission denied\" on getting device info."
+            echo "* If this is the case, try moving iwannabrute to the Desktop or Documents folder."
+        fi
+
+        if [[ -z $device_disable_sudoloop ]]; then
+            device_sudoloop=1 # Run some tools as root for device detection if set to 1. (for Linux)
+            trap "clean_sudo" EXIT
+        fi
+        if [[ $(uname -m) == "a"* || $device_sudoloop == 1 || $live_cdusb == 1 ]]; then
+            if [[ $live_cdusb != 1 ]]; then
+                echo "* Enter your user password when prompted"
+            fi
+            sudo -v
+            (while true; do sudo -v; sleep 60; done) &
+            sudoloop_pid=$!
+            futurerestore="sudo "
+            gaster="sudo "
+            idevicerestore="sudo "
+            ipwnder="sudo "
+            irecovery="sudo "
+            irecovery2="sudo "
+            irecovery3="sudo "
+            if [[ ! -d $dir && $(ls ../bin/Linux) ]]; then
+                echo "Running on platform: $platform ($platform_ver - $platform_arch)"
+                error "Failed to find bin directory for $platform_arch, found $(ls -x ../bin/Linux) instead." \
+                "* Download the \"Linux_$platform_arch\" or \"complete\" version to continue (or do a git clone)"
+            fi
+            trap "clean_usbmuxd" EXIT
+            if [[ $othertmp == 0 ]]; then
+                if [[ $(command -v systemctl) ]]; then
+                    sudo systemctl stop usbmuxd
+                elif [[ $(command -v rc-service) ]]; then
+                    sudo rc-service usbmuxd zap
+                else
+                    sudo killall -9 usbmuxd usbmuxd2 2>/dev/null
+                fi
+                #sudo killall usbmuxd 2>/dev/null
+                #sleep 1
+            elif [[ $othertmp != 0 ]]; then
+                echo "Detected existing tmp folder(s), there might be other iwannabrute instance(s) running"
+                echo "Not running usbmuxd"
+            fi
+        fi
+        gaster+="$dir/gaster"
+
+    elif [[ $(uname -m) == "iP"* ]]; then
+        error "Running iwannabrute on iOS is not supported (yet)" "* Supported platforms: Linux, macOS"
+
+    elif [[ $OSTYPE == "darwin"* ]]; then
+        platform="macos"
+        platform_ver="${1:-$(sw_vers -productVersion)}"
+        dir="../bin/macos"
+
+
 
         # macos version check
         mac_majver="${platform_ver:0:2}"
@@ -219,29 +524,72 @@ set_tool_paths() {
             mac_minver=${mac_minver%.*}
             # go here if need to disable os x 10.11 support for now
             if (( mac_minver < 11 )); then
-                warn "Your macOS version ($platform_ver - $platform_arch) is not supported. Expect features to not work properly."
-                print "* Supported versions are macOS 10.11 and newer. (10.12 and newer recommended)"
+                echo "Your macOS version ($platform_ver - $platform_arch) is not supported. Expect features to not work properly."
+                echo "* Supported macOS versions are 10.11 and newer. (10.12 and newer recommended)"
                 pause
             fi
+            if (( mac_minver <= 11 )); then
+                mac_cocoa=1
+                if [[ -z $(command -v cocoadialog) ]]; then
+                    local error_msg="* You need to install cocoadialog from MacPorts."
+                    error_msg+=$'\n* Please read the wiki and install the requirements needed in MacPorts: https://github.com/LukeZGD/Legacy-iOS-Kit/wiki/How-to-Use'
+                    error_msg+=$'\n* Also make sure that /opt/local/bin (or /usr/local/bin) is in your $PATH.'
+                    error_msg+=$'\n* You may try running this command: export PATH="/opt/local/bin:$PATH"'
+                    error "Cannot find cocoadialog, cannot continue." "$error_msg"
+                fi
+            fi
+            if [[ $(command -v curl) == "/usr/bin/curl" ]] && (( mac_minver < 15 )); then
+                local error_msg="* You need to install curl from MacPorts."
+                error_msg+=$'\n* Please read the wiki and install the requirements needed in MacPorts: https://github.com/LukeZGD/Legacy-iOS-Kit/wiki/How-to-Use'
+                error_msg+=$'\n* Also make sure that /opt/local/bin (or /usr/local/bin) is in your $PATH.'
+                error_msg+=$'\n* You may try running this command: export PATH="/opt/local/bin:$PATH"'
+                error "Outdated curl detected, cannot continue." "$error_msg"
+            fi
+            case $mac_minver in
+                11 ) mac_name="El Capitan";;
+                12 ) mac_name="Sierra";;
+                13 ) mac_name="High Sierra";;
+                14 ) mac_name="Mojave";;
+                15 ) mac_name="Catalina";;
+            esac
         fi
+        case $mac_majver in
+            11 ) mac_name="Big Sur";;
+            12 ) mac_name="Monterey";;
+            13 ) mac_name="Ventura";;
+            14 ) mac_name="Sonoma";;
+            15 ) mac_name="Sequoia";;
+        esac
+        if [[ -n $mac_name ]]; then
+            platform_ver="$mac_name $platform_ver"
+        fi
+
+        bspatch="$(command -v bspatch)"
+        cocoadialog="$(command -v cocoadialog)"
+        gaster+="../bin/macos/gaster"
+        ipwnder32="$dir/ipwnder32"
+        PlistBuddy="/usr/libexec/PlistBuddy"
+        sha1sum="$(command -v shasum) -a 1"
+        tsschecker="../bin/macos/tsschecker"
+        zenity="../bin/macos/zenity"
+        scp2="/usr/bin/scp"
+        ssh2="/usr/bin/ssh"
 
         # kill macos daemons
         killall -STOP AMPDevicesAgent AMPDeviceDiscoveryAgent MobileDeviceUpdater
+
     else
-        echo "Your platform ($OSTYPE) is not supported." "* Supported platforms: macOS"
-        exit
+        error "Your platform ($OSTYPE) is not supported." "* Supported platforms: Linux, macOS"
     fi
-
-
     echo "Running on platform: $platform ($platform_ver - $platform_arch)"
     if [[ ! -d $dir ]]; then
-        echo "Failed to find bin directory ($dir), cannot continue." \
-        "* Git clone iwannabrute again"
+        error "Failed to find bin directory ($dir), cannot continue." \
+        "* Re-download iwannabrute from releases (or do a git clone/reset)"
     fi
     if [[ $device_sudoloop == 1 ]]; then
         sudo chmod +x $dir/*
         if [[ $? != 0 ]]; then
-            echo "Failed to set up execute permissions of binaries, cannot continue. Try to move iwannabrute somewhere else."
+            error "Failed to set up execute permissions of binaries, cannot continue. Try to move iwannabrute somewhere else."
         fi
     else
         chmod +x $dir/*
@@ -256,19 +604,7 @@ set_tool_paths() {
     ifuse="$(command -v ifuse)"
     ipwnder+="$dir/ipwnder"
     irecovery+="$dir/irecovery"
-    irecovery2+="$dir/irecovery2"
-    irecovery3+="../$dir/irecovery"
     jq="$dir/jq"
-
-    if [[ $(ssh -V 2>&1 | grep -c SSH_8.8) == 1 || $(ssh -V 2>&1 | grep -c SSH_8.9) == 1 ||
-          $(ssh -V 2>&1 | grep -c SSH_9.) == 1 || $(ssh -V 2>&1 | grep -c SSH_1) == 1 ]]; then
-        echo "    PubkeyAcceptedAlgorithms +ssh-rsa" >> ssh_config
-    elif [[ $(ssh -V 2>&1 | grep -c SSH_6) == 1 ]]; then
-        cat ./resources/ssh_config | sed "s,Add,#Add,g" | sed "s,HostKeyA,#HostKeyA,g" > ssh_config
-    fi
-    scp2+=" -F ./ssh_config"
-    ssh2+=" -F ./ssh_config"
-
 }
 
 check_ramdisk_cache(){
@@ -301,7 +637,7 @@ pwn_device() {
         exit
     fi
     # check if device in pwndfu already
-    if (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | bin/Darwin/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null); then
+    if (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | $dir/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null); then
         echo "Device already in pwnDFU mode."
         ipwndfu send_ibss
     fi
@@ -316,11 +652,11 @@ pwn_device() {
         echo "Use LukeZGD fork of checkm8-a5: https://github.com/LukeZGD/checkm8-a5"
         echo "You may also use checkm8-a5 for the Pi Pico: https://www.reddit.com/r/LegacyJailbreak/comments/1djuprf/working_checkm8a5_on_the_raspberry_pi_pico/"
         echo "Pwn device using checkm8-a5 and then connect it."
-        if ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | bin/Darwin/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null); then
+        if ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | $dir/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null); then
             echo "[*] Waiting for device in pwnDFU mode"
         fi
     
-        while ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | bin/Darwin/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null ); do
+        while ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null | $dir/irecovery -q 2> /dev/null | grep 'PWND' >> /dev/null ); do
             sleep 1
         done
 
@@ -332,11 +668,11 @@ pwn_device() {
         ipwndfu pwn
         ;;
     ipwnder32)
-        echo "Using ipwnder32 for pwning..."
-        ipwnder32
+        echo "Using ipwnder for pwning..."
+        ipwnder
         ;;
     *)
-        echo "ipwnder value is empty. wtf"
+        echo "pwnder value is empty. wtf"
         exit 1
         ;;
     esac
@@ -463,6 +799,7 @@ ipwndfu() {
 
 }
 
+
 download_file() {
     # usage: download_file {link} {target location} {sha1}
     local filename="$(basename $2)"
@@ -485,7 +822,7 @@ get_device_info() {
     fake_deviceid=""
     for arg in "$@"; do
         case $arg in
-            fake-deviceid=*)
+            fake-device*)
                 fake_deviceid="${arg#*=}"
                 ;;
         esac
@@ -495,15 +832,25 @@ get_device_info() {
         is_fake_device=true
         deviceid="$fake_deviceid"
     else
-        if ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' > /dev/null); then
-            echo "[*] Waiting for device in DFU mode"
+        if [ "$oscheck" = 'Darwin' ]; then
+            if ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null); then
+                echo "[*] Waiting for device in DFU mode"
+            fi
+            
+            while ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' >> /dev/null); do
+                sleep 1
+            done
+        else
+            if ! (lsusb 2> /dev/null | grep ' Apple, Inc. Mobile Device (DFU Mode)' >> /dev/null); then
+                echo "[*] Waiting for device in DFU mode"
+            fi
+            
+            while ! (lsusb 2> /dev/null | grep ' Apple, Inc. Mobile Device (DFU Mode)' >> /dev/null); do
+                sleep 1
+            done
         fi
 
-        while ! (system_profiler SPUSBDataType 2> /dev/null | grep ' Apple Mobile Device (DFU Mode)' > /dev/null); do
-            sleep 1
-        done
-
-        deviceid=$(bin/Darwin/irecovery -q | grep PRODUCT | sed 's/PRODUCT: //')
+        deviceid=$($dir/irecovery -q | grep PRODUCT | sed 's/PRODUCT: //')
     fi
     case $deviceid in
         "iPhone3,1") device_name="iPhone 4 (GSM)" default_version="7.1.2" pwnder="ipwnder32" ;;
@@ -516,6 +863,7 @@ get_device_info() {
         "iPhone5,4") device_name="iPhone 5C (Global)" default_version="9.0.2" pwnder="ipwndfu";;
     #   Disabled due iOS 5.1.1 is last version for iPad 1(aes patch needs to be reworked)
     #   "iPad1,1") device_name="iPad 1" default_version="5.1.1" pwnder="ipwnder32";;
+        "iPad1,1") echo "iPad 1st support is disabled"; exit;;
         "iPad2,1") device_name="iPad 2 (Wi-Fi)" default_version="9.0.2" pwnder="a5";;
         "iPad2,2") device_name="iPad 2 (GSM)" default_version="9.0.2" pwnder="a5";;
         "iPad2,3") device_name="iPad 2 (CDMA)" default_version="9.0.2" pwnder="a5";;
@@ -547,34 +895,34 @@ send_ramdisk() {
     cd ramdisks/bruteforce-$deviceid-$ios_version
     sleep 3
     echo "Sending iBSS..."
-    ../../bin/Darwin/irecovery -f iBSS
+    ../../$dir/irecovery -f iBSS
 
     sleep 1
     echo "Sending iBEC..."
-    ../../bin/Darwin/irecovery -f iBEC
+    ../../$dir/irecovery -f iBEC
 
     sleep 3
 
-    ../../bin/Darwin/irecovery -c "bgcolor 0 255 255"
+    ../../$dir/irecovery -c "bgcolor 0 255 255"
 
     sleep 1
 
     echo "Sending device tree..."
-    ../../bin/Darwin/irecovery -f devicetree
-    ../../bin/Darwin/irecovery -c devicetree
+    ../../$dir/irecovery -f devicetree
+    ../../$dir/irecovery -c devicetree
 
     sleep 1
 
     echo "Sending ramdisk..."
-    ../../bin/Darwin/irecovery -f ramdisk.dmg
-    ../../bin/Darwin/irecovery -c ramdisk
+    ../../$dir/irecovery -f ramdisk.dmg
+    ../../$dir/irecovery -c ramdisk
 
     sleep 1
 
     echo "Sending kernelcache..."
-    ../../bin/Darwin/irecovery -f kernelcache
+    ../../$dir/irecovery -f kernelcache
     echo "Booting device now..."
-    ../../bin/Darwin/irecovery -c bootx
+    ../../$dir/irecovery -c bootx
     echo ""
     echo "Device should show text on screen now."
     echo "After passcode is found please reboot using home + power button."
@@ -610,7 +958,7 @@ version_check() {
 version_update_check() {
     pushd "$(dirname "$0")/tmp$$" >/dev/null
     if [[ $platform == "macos" && ! -e ./resources/firstrun ]]; then
-        xattr -cr ./bin/Darwin/Darwin
+        xattr -cr ./$dir/Darwin
     fi
     echo "Checking for updates..."
     github_api=$(curl https://api.github.com/repos/platinumstufff/iwannabrute/latest 2>/dev/null)
@@ -624,33 +972,33 @@ version_update() {
     local req
     select_yesno "Do you want to update now?" 1
     if [[ $? != 1 ]]; then
-        log "User selected N, cannot continue. Exiting."
+        echo "User selected N, cannot continue. Exiting."
         exit
     fi
     if [[ -d .git ]]; then
-        log "Running git pull..."
-        print "* If this fails for some reason, run: git reset --hard"
-        print "* To clean more files if needed, run: git clean -df"
+        echo "Running git pull..."
+        echo "* If this fails for some reason, run: git reset --hard"
+        echo "* To clean more files if needed, run: git clean -df"
         git pull
         pushd "$(dirname "$0")/tmp$$" >/dev/null
-        log "Done! Please run the script again"
+        echo "Done! Please run the script again"
         exit
     elif (( $(ls bin | wc -l) > 1 )); then
         req=".assets[] | select (.name|test(\"complete\")) | .browser_download_url"
-    elif [[ $platform == "linux" ]]; then
+    elif [[ $platform == "Linux" ]]; then
         req=".assets[] | select (.name|test(\"${platform}_$platform_arch\")) | .browser_download_url"
     else
         req=".assets[] | select (.name|test(\"${platform}\")) | .browser_download_url"
     fi
     pushd "$(dirname "$0")/tmp$$" >/dev/null
     url="$(echo "$github_api" | $jq -r "$req")"
-    log "Downloading: $url"
+    echo "Downloading: $url"
     curl -L $url -o latest.zip
     if [[ ! -s latest.zip ]]; then
         error "Download failed. Please run the script again"
     fi
     popd >/dev/null
-    log "Updating..."
+    echo "Updating..."
     cp resources/firstrun tmp$$ 2>/dev/null
     rm -r bin/ LICENSE README.md restore.sh
     if [[ $device_sudoloop == 1 ]]; then
@@ -660,7 +1008,7 @@ version_update() {
     unzip -q tmp$$/latest.zip -d .
     cp tmp$$/firstrun resources 2>/dev/null
     pushd "$(dirname "$0")/tmp$$" >/dev/null
-    log "Done! Please run the script again"
+    echo "Done! Please run the script again"
     exit
 }
 
@@ -751,6 +1099,7 @@ done
 if [[ ! -e "./resources/firstrun" || $(cat "./resources/firstrun") != "$platform_ver" || $check_fail == 1 ]]; then
     install_depends
 fi
+
 get_device_info "$@"
 echo ""
 echo "Enter ramdisk version ($default_version is default)"
@@ -781,6 +1130,8 @@ pwn_device
 send_ramdisk
 
 }
+
+
 othertmp=$(ls "$(dirname "$0")" | grep -c tmp)
 
 pushd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null
