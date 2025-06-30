@@ -254,7 +254,6 @@ set_tool_paths() {
     ideviceinstaller+="$dir/ideviceinstaller"
     idevicerestore+="$dir/idevicerestore"
     ifuse="$(command -v ifuse)"
-    ipwnder+="$dir/ipwnder"
     irecovery+="$dir/irecovery"
     irecovery2+="$dir/irecovery2"
     irecovery3+="../$dir/irecovery"
@@ -465,6 +464,8 @@ ipwndfu() {
 }
 
 ipwnder() {
+    echo "Pwning device using ipwnder"
+    ./bin/Darwin/ipwnder
 
 }
 
