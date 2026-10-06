@@ -3,16 +3,30 @@
 Bruteforce A5-A6 numeric password with ease.
 </p>
 
+# My Setup
+Working fine with 
+Linux mint 22.3 xfce usb boot
+Iphone 5c
+
+i didnt tried with other devices
+
 # Prerequsites
 
-1. A computer running macOS.
+1. A computer running macOS or Linux (x86_64).
 2. A compatible device (A5-A6)
 
 # Usage
 iwannabrute needs initial setup before usage.
- - Homebrew: `brew install bash curl libusb`
- - MacPorts: `sudo port install bash curl libusb`
- - For macOS 12.7.6 and lower, use MacPorts, not Homebrew.
+ - **macOS**:
+   - Homebrew: `brew install bash curl libusb`
+   - MacPorts: `sudo port install bash curl libusb`
+   - For macOS 12.7.6 and lower, use MacPorts, not Homebrew.
+ - **Linux (Debian / Ubuntu / Linux Mint)**:
+   - `sudo apt update && sudo apt install curl git patch unzip xxd zip libusb-1.0-0 usbmuxd python3`
+ - **Linux (Arch)**:
+   - `sudo pacman -S curl git patch unzip diffutils xxd zip libusb python usbmuxd`
+ - **Linux (Fedora)**:
+   - `sudo dnf install curl git patch unzip xxd zip libusbx python3 usbmuxd`
  
 1. Clone and cd into this repository: `git clone https://github.com/platinumstufff/iwannabrute --recursive && cd iwannabrute`
 2. Place your device into DFU mode
@@ -33,7 +47,6 @@ The tool will use the AES engine as much as possible with no restrictions at the
 
 # Soon™
 
-- Linux support
 - A4 support
 - Disable password automatically
 
